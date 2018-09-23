@@ -15,7 +15,7 @@ config = {
     'fps': 30,
     'delay': 1000,
     'd_repeat': 100,
-    'num_players': 2,
+    'num_players': None,
 }
 
 colors = [
@@ -132,7 +132,7 @@ def quit():
 
 def start_button():
     if config['game_state'] == 'gameover':
-        config['game_state'] = 'starting'
+        config['game_state'] = 'normal'
         run()
     elif config['game_state'] == 'normal':
         config['game_state'] = 'paused'
@@ -170,6 +170,17 @@ def status_stone(stone):
         tmp_surface.blit(stone_surface, ((tmp_w - stone_w) // 2, (tmp_h - stone_h) // 2))
 
     return tmp_surface
+
+
+def rand_lines(players):
+    rcl1 = players[0].rand_line_counter
+    rcl2 = players[1].rand_line_counter
+    if rcl1 - rcl2 > 0:
+        players[1].add_rand_lines(rcl1 - rcl2)
+    elif rcl2 - rcl1 > 0:
+        players[0].add_rand_lines(rcl2 - rcl1)
+    for i, player in enumerate(players):
+        player.rand_line_counter = 0
 
 
 class StartMenu:
@@ -235,6 +246,8 @@ class Player:
 
         self.lines = 0
         self.score = 0
+
+        self.rand_line_counter = 0
 
         self.controls = self.set_controls()
 
@@ -306,14 +319,26 @@ class Player:
                 if val:
                     self.board[self.stone_y + cy][self.stone_x + cx] = val
 
+    def add_rand_lines(self, count):
+        for i in range(count):
+            new_row = []
+            empty_spot = rand(config['cols'])
+            for x in range(config['cols']):
+                if x == empty_spot:
+                    new_row.append(0)
+                else:
+                    new_row.append(rand(1, len(colors)))
+            del (self.board[0])
+            self.board += [new_row]
+
     def remove_lines(self):
         count = 0
         while True:
             for i, row in enumerate(self.board):
                 if 0 not in row:
                     del (self.board[i])
-                    self.lines += 1
                     self.score += 10 + count * 10
+                    self.lines += 1
                     count += 1
                     new_row = []
                     for x in range(config['cols']):
@@ -322,6 +347,8 @@ class Player:
                     break
             else:
                 break
+        if count > 0:
+            self.rand_line_counter = count - 1
 
     def drop(self):
         if config['game_state'] == 'normal':
@@ -329,7 +356,6 @@ class Player:
                 self.merge()
                 self.new_stone()
                 self.remove_lines()
-                set_speed(self.lines)
                 self.reserved = False
             else:
                 self.stone_y += 1
@@ -340,7 +366,6 @@ class Player:
                 self.merge()
                 self.new_stone()
                 self.remove_lines()
-                set_speed(self.lines)
                 self.reserved = False
             else:
                 self.stone_y += 1
@@ -512,9 +537,14 @@ def run():
                     players[event.joy].handle_event(event)
                 elif event.type == pygame.JOYAXISMOTION:
                     players[event.joy].handle_event(event)
-                else:
+                elif event.type == USEREVENT + 1:
+                    if len(players) == 2:
+                        rand_lines(players)
+                    lines = 0
                     for i, player in enumerate(players):
                         player.handle_event(event)
+                        lines += player.lines
+                    set_speed(lines)
 
             fps_limit.tick(config['fps'])
 
