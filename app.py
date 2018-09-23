@@ -545,6 +545,9 @@ def run():
                         player.handle_event(event)
                         lines += player.lines
                     set_speed(lines)
+                else:
+                     for i, player in enumerate(players):
+                         player.handle_event(event)
 
             fps_limit.tick(config['fps'])
 
