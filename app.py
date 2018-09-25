@@ -11,7 +11,7 @@ config = {
     'rows': 20,
     'cols': 10,
     'border_width': 2,
-    'game_state': 'starting',  # gamestates: 0 = start_menu, 1 = normal, 2 = paused, 3 = gameover
+    'game_state': 'starting',  # gamestates: 0 = starting, 1 = normal, 2 = paused, 3 = gameover
     'fps': 30,
     'delay': 1000,
     'd_repeat': 100,
@@ -190,8 +190,10 @@ class StartMenu:
         pygame.font.Font(pygame.font.get_default_font(), 40).render("1 Player", False, (255, 255, 255)),
         pygame.font.Font(pygame.font.get_default_font(), 40).render("2 Player", False, (255, 255, 255))
     ]
-    menu_w = max(items[0].get_width(), items[1].get_width()) + pointer.get_width()
-    menu_h = items[0].get_height() + items[1].get_height() + 10 * len(items)
+    buffer = 20
+
+    menu_w = max(items[0].get_width(), items[1].get_width()) + pointer.get_width() + buffer * 2
+    menu_h = (items[0].get_height() + 10) * len(items) + buffer * 2
 
     def __init__(self):
         self.menu = pygame.Surface((self.menu_w, self.menu_h))
@@ -200,12 +202,13 @@ class StartMenu:
 
     def update(self):
         self.menu.fill((0, 0, 0))
-        y_pos = 0
-        x_pos = self.pointer.get_width()
+        pygame.draw.rect(self.menu, (255, 255, 255), (0, 0, self.menu_w, self.menu_h), 1)
+        y_pos = self.buffer
+        x_pos = self.buffer + self.pointer.get_width()
         for item in self.items:
             self.menu.blit(item, (x_pos, y_pos))
             y_pos += item.get_height() + 10
-        self.menu.blit(self.pointer, (0, self.selected * (self.pointer.get_height() + 10)))
+        self.menu.blit(self.pointer, (self.buffer, self.buffer + self.selected * (self.pointer.get_height() + 10)))
 
     def move_pointer(self, val):
         self.selected -= val
@@ -219,6 +222,56 @@ class StartMenu:
         config['num_players'] = self.selected + 1
         config['game_state'] = 'normal'
         run()
+
+
+class PauseMenu:
+    pointer = pygame.font.Font(pygame.font.get_default_font(), 40).render("->", False, (255, 255, 255))
+    title = pygame.font.Font(pygame.font.get_default_font(), 40).render("Paused", False, (255, 255, 255))
+    items = [
+        pygame.font.Font(pygame.font.get_default_font(), 40).render("Resume", False, (255, 255, 255)),
+        pygame.font.Font(pygame.font.get_default_font(), 40).render("Quit", False, (255, 255, 255))
+    ]
+
+    buffer = 20
+    menu_w = max(items[0].get_width(), items[1].get_width()) + pointer.get_width() + buffer * 2
+    menu_h = (items[0].get_height() + 10) * (len(items) + 1) + buffer * 2
+
+    def __init__(self):
+        self.menu = pygame.Surface((self.menu_w, self.menu_h))
+        self.selected = 0
+        self.update()
+
+    def update(self):
+        self.menu.fill((0, 0, 0))
+        pygame.draw.rect(self.menu, (255, 255, 255), (0, 0, self.menu_w, self.menu_h), 2)
+        y_pos = 0 + self.buffer
+        x_pos = (self.menu_w - self.title.get_width()) // 2
+
+        self.menu.blit(self.title, (x_pos, y_pos))
+
+        y_pos += self.title.get_height() + 10
+        x_pos = self.pointer.get_width() + self.buffer
+
+        for item in self.items:
+            self.menu.blit(item, (x_pos, y_pos))
+            y_pos += item.get_height() + 10
+        self.menu.blit(self.pointer, (self.buffer,
+                                      self.buffer + (self.selected + 1) * (self.pointer.get_height() + 10)))
+
+    def move_pointer(self, val):
+        self.selected -= val
+        if self.selected > len(self.items) - 1:
+            self.selected = 0
+        elif self.selected < 0:
+            self.selected = len(self.items) - 1
+        self.update()
+
+    def run_selected(self):
+        if self.selected == 0:
+            config['game_state'] = 'normal'
+        elif self.selected == 1:
+            config['game_state'] = 'starting'
+            run()
 
 
 class Player:
@@ -486,6 +539,10 @@ def run():
                             key_actions[key]()
                 elif event.type == pygame.JOYHATMOTION:
                     start_menu.move_pointer(event.value[1])
+                elif event.type == pygame.JOYAXISMOTION:
+                    if event.axis == 1:
+                        if abs(event.value) > 0.9:
+                            start_menu.move_pointer(int(event.value))
                 elif event.type == pygame.JOYBUTTONDOWN:
                     if event.button == 0:
                         start_menu.run_selected()
@@ -497,31 +554,59 @@ def run():
         for i in range(config['num_players']):
             players.append(Player(i))
 
-        key_actions = {
-            'ESCAPE': quit,
-            'LEFT': lambda: players[0].move(-1),
-            'RIGHT': lambda: players[0].move(+1),
-            'DOWN': players[0].drop,
-            'UP': players[0].rotate_stone_ccw,
-            'SPACE': start_button,
-        }
+        pause_menu = PauseMenu()
 
         pygame.time.set_timer(USEREVENT + 1, config['delay'])
 
         while True:
             if config['game_state'] == 'gameover':
                 msg_center("GAME OVER!", main_screen)
-            else:
-                if config['game_state'] == 'paused':
-                    msg_center("Pause", main_screen)
-                else:
-                    for i, player in enumerate(players):
-                        player.update_screen()
-                        main_x = display_width // len(players)
-                        player_x, player_y = player.screen.get_size()
-                        main_screen.blit(player.screen, (
-                            (main_x - player_x) // 2 + i * main_x,
-                            (display_height - player_y) // 2))
+
+            elif config['game_state'] == 'paused':
+                pause_w, pause_h = pause_menu.menu.get_size()
+                main_screen.blit(pause_menu.menu,
+                                 ((display_width - pause_w) // 2,
+                                  (display_height - pause_h) // 2))
+                key_actions = {
+                    'ESCAPE': quit,
+                    'DOWN': lambda: pause_menu.move_pointer(1),
+                    'UP': lambda: pause_menu.move_pointer(-1),
+                    'SPACE': pause_menu.run_selected
+                }
+                for event in pygame.event.get():
+                    if event.type == pygame.QUIT:
+                        quit()
+                    elif event.type == pygame.KEYDOWN:
+                        for key in key_actions:
+                            if event.key == eval("pygame.K_" + key):
+                                key_actions[key]()
+                    elif event.type == pygame.JOYHATMOTION:
+                        pause_menu.move_pointer(event.value[1])
+                    elif event.type == pygame.JOYAXISMOTION:
+                        if event.axis == 1:
+                            if abs(event.value) > 0.9:
+                                pause_menu.move_pointer(int(event.value))
+                    elif event.type == pygame.JOYBUTTONDOWN:
+                        if event.button == 0:
+                            pause_menu.run_selected()
+
+            else: #gamestate = normal
+                 key_actions = {
+                    'ESCAPE': quit,
+                    'LEFT': lambda: players[0].move(-1),
+                    'RIGHT': lambda: players[0].move(+1),
+                    'DOWN': players[0].drop,
+                    'UP': players[0].rotate_stone_ccw,
+                    'SPACE': start_button
+                 }
+
+                 for i, player in enumerate(players):
+                    player.update_screen()
+                    main_x = display_width // len(players)
+                    player_x, player_y = player.screen.get_size()
+                    main_screen.blit(player.screen, (
+                        (main_x - player_x) // 2 + i * main_x,
+                        (display_height - player_y) // 2))
             pygame.display.update()
 
             for event in pygame.event.get():
