@@ -185,7 +185,7 @@ def rand_lines(players):
 
 class StartMenu:
     pointer = pygame.font.Font(pygame.font.get_default_font(), 40).render("->", False, (255, 255, 255))
-
+    title = pygame.font.Font(pygame.font.get_default_font(), 50).render("TETRIS", False, (255, 255, 255))
     items = [
         pygame.font.Font(pygame.font.get_default_font(), 40).render("1 Player", False, (255, 255, 255)),
         pygame.font.Font(pygame.font.get_default_font(), 40).render("2 Player", False, (255, 255, 255))
@@ -205,6 +205,9 @@ class StartMenu:
         pygame.draw.rect(self.menu, (255, 255, 255), (0, 0, self.menu_w, self.menu_h), 1)
         y_pos = self.buffer
         x_pos = self.buffer + self.pointer.get_width()
+
+        main_screen.blit(self.title, ((display_width - self.title.get_width()) // 2, 50))
+
         for item in self.items:
             self.menu.blit(item, (x_pos, y_pos))
             y_pos += item.get_height() + 10
@@ -436,14 +439,14 @@ class Player:
     def set_controls(self):
         controls = {
             'joy_button_actions': {
-                0: self.rotate_stone_cw,      # A button
-                1: self.rotate_stone_ccw,     # B button
+                0: self.rotate_stone_cw,  # A button
+                1: self.rotate_stone_ccw,  # B button
                 # 2: None,                    # X button
                 # 3: None,                    # Y button
-                4: self.reserve_stone,        # L1 button
-                5: self.reserve_stone,        # R1 button
+                4: self.reserve_stone,  # L1 button
+                5: self.reserve_stone,  # R1 button
                 # 6: None,                    # select button
-                7: start_button               # start button
+                7: start_button  # start button
             },
             'joy_hat_actions': {
                 'd_pad': (0, 0)
@@ -590,17 +593,16 @@ def run():
                         if event.button == 0:
                             pause_menu.run_selected()
 
-            else: #gamestate = normal
-                 key_actions = {
+            else:  # gamestate = normal
+                key_actions = {
                     'ESCAPE': quit,
                     'LEFT': lambda: players[0].move(-1),
                     'RIGHT': lambda: players[0].move(+1),
                     'DOWN': players[0].drop,
                     'UP': players[0].rotate_stone_ccw,
                     'SPACE': start_button
-                 }
-
-                 for i, player in enumerate(players):
+                }
+                for i, player in enumerate(players):
                     player.update_screen()
                     main_x = display_width // len(players)
                     player_x, player_y = player.screen.get_size()
@@ -631,8 +633,8 @@ def run():
                         lines += player.lines
                     set_speed(lines)
                 else:
-                     for i, player in enumerate(players):
-                         player.handle_event(event)
+                    for i, player in enumerate(players):
+                        player.handle_event(event)
 
             fps_limit.tick(config['fps'])
 
